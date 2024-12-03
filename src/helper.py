@@ -7,7 +7,12 @@ from langchain.chains.summarize import load_summarize_chain
 from langchain_ollama import OllamaEmbeddings
 from langchain.vectorstores import FAISS
 from langchain.chains import RetrievalQA
+from langchain_groq import ChatGroq
 from src.prompt import *
+import os
+from dotenv import load_dotenv
+load_dotenv()
+GROQ_API_KEY=os.getenv("GROQ_API_KEY")
 
 def file_processing(file_path):
     loader = PyPDFLoader(file_path)
@@ -33,19 +38,14 @@ def llm_pipeline(file_path):
 
      from langchain_ollama import ChatOllama
 
-     llm = ChatOllama(
-     model = "llama3.2:1b",
-     temperature = 0.8,
-     num_predict = 256,
-     # other params ...
-     )
+     llm1 = ChatGroq(temperature=0,groq_api_key = GROQ_API_KEY,model_name="llama-3.1-70b-versatile")
     
      PROMPT_QUESTIONS = PromptTemplate(template=prompt_template, input_variables=['text'])
      REFINE_PROMPT_QUESTIONS = PromptTemplate(
      input_variables=["existing_answer", "text"],
      template=refine_template,
      )
-     ques_gen_chain = load_summarize_chain(llm = llm, 
+     ques_gen_chain = load_summarize_chain(llm = llm1, 
                                            chain_type = "refine", 
                                            verbose = True, 
                                            question_prompt=PROMPT_QUESTIONS, 
@@ -53,27 +53,22 @@ def llm_pipeline(file_path):
      
      ques = ques_gen_chain.invoke(documents)
      result = ques['output_text']
+     result_list = result.split("\n")
      embed = OllamaEmbeddings(
      model="llama3.2:1b"
       )
      
      vector_store = FAISS.from_documents(document_answer_gen, embed)
 
-     llm_answer_gen =ChatOllama(
-     model = "llama3.2:1b",
-     temperature = 0.8,
-     num_predict = 256,
-     # other params ...
-      )
-     result_list = result.split("\n")
-     result1 = result_list[2:12]
+    
+     
 
 
-     answer_generation_chain = RetrievalQA.from_chain_type(llm=llm_answer_gen, 
+     answer_generation_chain = RetrievalQA.from_chain_type(llm=llm1, 
                                                chain_type="stuff", 
                                                retriever=vector_store.as_retriever())
      
-     for question in result1:
+     for question in result_list:
         print("Question: ", question)
         answer = answer_generation_chain.run(question)
         print("Answer: ", answer)
@@ -83,4 +78,4 @@ def llm_pipeline(file_path):
             f.write("Question: " + question + "\n")
             f.write("Answer: " + answer + "\n"+ "\n"+ "\n")
        
-     return  answer_generation_chain,result1
+     return  answer_generation_chain,result_list
